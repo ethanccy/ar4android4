@@ -3,27 +3,33 @@ package com.ar4android;
 import com.jme3.app.AndroidHarness;
 import android.content.pm.ActivityInfo;
 import android.hardware.Camera;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
 
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import android.graphics.ImageFormat;
 import android.graphics.PixelFormat;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.NinePatchDrawable;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.Gravity;
 import android.view.ViewGroup;
+import android.view.ViewGroup.LayoutParams;
 
 import com.jme3.system.android.AndroidConfigChooser.ConfigType;
 import com.jme3.texture.Image;
 
-
 public class AR4AndroidActivity extends AndroidHarness {
 
-	private static final String TAG = "CameraAccessJMEActivity";
+	private static final String TAG = "SuperimposeJMEActivity";
 	private Camera mCamera;
 	private CameraPreview mPreview;
-	private int mDesiredCameraPreviewWidth = 640;
-
+	private int mDesiredCameraPreviewWidth = 640;	
 	private byte[] mPreviewBufferRGB565 = null;
 	java.nio.ByteBuffer mPreviewByteBufferRGB565;
 	// the actual size of the preview images
@@ -35,24 +41,24 @@ public class AR4AndroidActivity extends AndroidHarness {
 
 	private boolean stopPreview = false;
 	Image cameraJMEImageRGB565;
-	
+
 	// Implement the interface for getting copies of preview frames
 	private final Camera.PreviewCallback mCameraCallback = new Camera.PreviewCallback() {
-		public void onPreviewFrame(byte[] data, Camera c) {	
+		public void onPreviewFrame(byte[] data, Camera c) {
 			if (c != null && stopPreview == false) {
 				mPreviewByteBufferRGB565.clear();
 				// Perform processing on the camera preview data.
-				if(pixelFormatConversionNeeded) {
+				if (pixelFormatConversionNeeded) {
 					yCbCrToRGB565(data, mPreviewWidth, mPreviewHeight,
-						mPreviewBufferRGB565);				
-					mPreviewByteBufferRGB565.put(mPreviewBufferRGB565);				
-				} else {					
+							mPreviewBufferRGB565);
+					mPreviewByteBufferRGB565.put(mPreviewBufferRGB565);
+				} else {
 					mPreviewByteBufferRGB565.put(data);
 				}
 				cameraJMEImageRGB565.setData(mPreviewByteBufferRGB565);
 				if ((com.ar4android.AR4AndroidApplication) app != null) {
 					((com.ar4android.AR4AndroidApplication) app)
-							.setTexture(cameraJMEImageRGB565);
+							.setVideoBGTexture(cameraJMEImageRGB565);
 				}
 			}
 		}
@@ -63,11 +69,10 @@ public class AR4AndroidActivity extends AndroidHarness {
 		Camera c = null;
 		try {
 			// get a Camera instance
-			c = Camera.open(0);
+			c = Camera.open();
 		} catch (Exception e) {
 			// Camera is does not exist or is already in use
 			Log.e(TAG, "Camera not available or in use.");
-			
 		}
 		// return NULL if camera is unavailable, otherwise return the Camera
 		// instance
@@ -94,6 +99,8 @@ public class AR4AndroidActivity extends AndroidHarness {
 		if (foundDesiredWidth) {
 			parameters.setPreviewSize(currentWidth, currentHeight);
 		}
+	
+
 		// we also want to use RGB565 directly
 		List<Integer> pixelFormats = parameters.getSupportedPreviewFormats();
 		for (Integer format : pixelFormats) {
@@ -113,7 +120,8 @@ public class AR4AndroidActivity extends AndroidHarness {
 
 	public AR4AndroidActivity() {
 		// Set the application class to run
-		appClass = "com.ar4android.cameraAccessJME.CameraAccessJME";
+		// appClass = "mygame.Main";
+		appClass = "com.ar4android.superimposeJME.SuperimposeJME";
 		// Try ConfigType.FASTEST; or ConfigType.LEGACY if you have problems
 		eglConfigType = ConfigType.BEST;
 		// Exit Dialog title & message
@@ -123,7 +131,6 @@ public class AR4AndroidActivity extends AndroidHarness {
 		eglConfigVerboseLogging = false;
 		// Choose screen orientation
 		screenOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE;
-		// Invert the MouseEvents X (default = true)
 		mouseEventsInvertX = true;
 		// Invert the MouseEvents Y (default = true)
 		mouseEventsInvertY = true;
@@ -133,13 +140,11 @@ public class AR4AndroidActivity extends AndroidHarness {
 	// needed for camera preview
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
-		super.onCreate(savedInstanceState);			
+		super.onCreate(savedInstanceState);
 	}
 	
-	
-	
 	@Override
-    public void onResume() {
+	public void onResume() {
     	super.onResume();    	
     	stopPreview = false;
 		// Create an instance of Camera
@@ -172,7 +177,6 @@ public class AR4AndroidActivity extends AndroidHarness {
 		ViewGroup parent = (ViewGroup) mPreview.getParent(); 
 		parent.removeView(mPreview);
 	}
-	
 
 	private void releaseCamera() {
 		if (mCamera != null) {
@@ -184,7 +188,6 @@ public class AR4AndroidActivity extends AndroidHarness {
 		}
 	}
 
-	// prepares the Camera preview callback buffers.
 	public void preparePreviewCallbackBuffer() {		
 		int pformat;
 		pformat = mCamera.getParameters().getPreviewFormat();
@@ -205,8 +208,9 @@ public class AR4AndroidActivity extends AndroidHarness {
 				mPreviewHeight, mPreviewByteBufferRGB565);
 	}
 
-	public static void yCbCrToRGB565(byte[] YCBCRs, int width, int height,
+	public static void yCbCrToRGB565(byte[] yuvs, int width, int height,
 			byte[] rgbs) {
+
 		// the end of the luminance data
 		final int lumEnd = width * height;
 		// points to the next luminance value pair
@@ -231,10 +235,10 @@ public class AR4AndroidActivity extends AndroidHarness {
 			}
 
 			// read the luminance and chromiance values
-			final int Y1 = YCBCRs[lumPtr++] & 0xff;
-			final int Y2 = YCBCRs[lumPtr++] & 0xff;
-			final int Cr = (YCBCRs[chrPtr++] & 0xff) - 128;
-			final int Cb = (YCBCRs[chrPtr++] & 0xff) - 128;
+			final int Y1 = yuvs[lumPtr++] & 0xff;
+			final int Y2 = yuvs[lumPtr++] & 0xff;
+			final int Cr = (yuvs[chrPtr++] & 0xff) - 128;
+			final int Cb = (yuvs[chrPtr++] & 0xff) - 128;
 			int R, G, B;
 
 			// generate first RGB components
