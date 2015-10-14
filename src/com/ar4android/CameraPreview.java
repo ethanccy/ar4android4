@@ -1,12 +1,12 @@
-/* CameraPreview - CameraAccessJME Example
+/* CameraPreview - SuperimposeJME Example
  * 
- * Example Chapter 2
+ * Example Chapter 3
  * accompanying the book
  * "Augmented Reality for Android Application Development", Packt Publishing, 2013.
  * 
  * Copyright � 2013 Jens Grubert, Raphael Grasset / Packt Publishing.
- * 
  */
+
 package com.ar4android;
 
 import android.content.Context;
